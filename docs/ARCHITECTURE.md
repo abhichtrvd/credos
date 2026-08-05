@@ -29,3 +29,7 @@ Every business record is scoped to a `companyId`. The authenticated actor's tena
 Replace the development in-memory repository with Postgres migrations, add refresh-token rotation, Argon2id hashing, rate limiting, an outbox/event bus, audit log, object storage, observability, backups, and secret management before handling live financial data.
 
 The database skeleton includes the outbox and the core storage boundaries for communications, risk, trust, reporting, and integrations. Workers and provider adapters are intentionally not enabled until their credentials, idempotency handling, and compliance reviews are in place.
+
+## Persistence floor
+
+`PostgresRepository` creates a database transaction for each tenant command and sets `credos.company_id` using PostgreSQL's transaction-local configuration. Migration `0004_tenant_rls.sql` makes row-level security enforce that boundary for every tenant-owned table. Production must connect using a non-owner database role, because PostgreSQL table owners bypass RLS by default.
