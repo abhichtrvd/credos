@@ -1,0 +1,12 @@
+{
+  "name": "credos",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@9.15.0",
+  "scripts": {
+    "dev": "pnpm --parallel --filter @credos/api --filter @credos/web dev",
+    "test": "pnpm --filter @credos/api test",
+    "lint": "pnpm --filter @credos/api lint"
+  },
+  "devDependencies": { "pnpm": "^9.15.0" }
+}

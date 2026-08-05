@@ -1,0 +1,15 @@
+node_modules/
+.pnpm-store/
+dist/
+coverage/
+.env
+.env.*
+!.env.example
+__pycache__/
+*.py[cod]
+.venv/
+.dart_tool/
+.flutter-plugins*
+build/
+.idea/
+.vscode/
