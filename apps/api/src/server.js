@@ -25,6 +25,10 @@ export const createServer = ({ service } = {}) => {
   if (request.method === 'POST' && cancellation) return json(response, 200, app.cancelInvoice(user, cancellation[1]));
   if (request.method === 'POST' && path === '/v1/payments') return json(response, 201, app.recordPayment(user.companyId, input));
   if (request.method === 'GET' && path === '/v1/payments') return json(response, 200, app.listPayments(user.companyId));
+  if (request.method === 'POST' && path === '/v1/collections') return json(response, 201, app.openCollectionCase(user, input));
+  if (request.method === 'GET' && path === '/v1/collections') return json(response, 200, app.listCollectionCases(user.companyId));
+  const promiseRoute = path.match(/^\/v1\/collections\/([^/]+)\/promises$/);
+  if (request.method === 'POST' && promiseRoute) return json(response, 201, app.recordPromise(user, promiseRoute[1], input));
   if (request.method === 'GET' && path === '/v1/dashboard') return json(response, 200, app.dashboard(user.companyId));
   return json(response, 404, { error: 'route not found' });
   };

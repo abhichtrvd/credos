@@ -10,7 +10,7 @@ export class CredosService {
     this.secret = secret;
     this.now = now;
     this.companies = new Map(); this.users = new Map(); this.customers = new Map();
-    this.invoices = new Map(); this.payments = new Map(); this.allocations = new Map(); this.auditEvents = [];
+    this.invoices = new Map(); this.payments = new Map(); this.allocations = new Map(); this.collectionCases = new Map(); this.promises = new Map(); this.auditEvents = [];
   }
   seedAdmin({ email = 'admin@credos.local', password = 'ChangeMe123!', name = 'CredOS Admin' } = {}) {
     const company = this.createCompany({ name: 'CredOS Demo' });
@@ -76,7 +76,27 @@ export class CredosService {
     if (!invoice || invoice.companyId !== actor.companyId) throw new Error('invoice not found');
     if (this.invoiceView(invoice).paid > 0) throw new Error('cannot cancel a partially paid invoice');
     if (invoice.status === 'cancelled') throw new Error('invoice is already cancelled');
-    invoice.status = 'cancelled'; this.audit(actor.companyId, actor.id, 'invoice.cancelled', 'invoice', invoice.id); return this.invoiceView(invoice);
+    invoice.status = 'cancelled'; for (const collectionCase of this.collectionCases.values()) if (collectionCase.invoiceId === invoice.id && collectionCase.status === 'open') collectionCase.status = 'closed'; this.audit(actor.companyId, actor.id, 'invoice.cancelled', 'invoice', invoice.id); return this.invoiceView(invoice);
+  }
+  openCollectionCase(actor, input) {
+    this.requireRole(actor, 'manager'); const invoice = this.invoices.get(input.invoiceId);
+    if (!invoice || invoice.companyId !== actor.companyId) throw new Error('invoice not found');
+    const view = this.invoiceView(invoice); if (view.outstanding === 0 || new Date(invoice.dueDate) >= this.now()) throw new Error('only overdue unpaid invoices can enter collections');
+    if ([...this.collectionCases.values()].some((item) => item.invoiceId === invoice.id && item.status === 'open')) throw new Error('an open collection case already exists');
+    const assignee = input.assignedTo || actor.id; const user = this.users.get(assignee); if (!user || user.companyId !== actor.companyId) throw new Error('assignee not found');
+    const collectionCase = { id: randomUUID(), companyId: actor.companyId, invoiceId: invoice.id, customerId: invoice.customerId, assignedTo: assignee, status: 'open', openedAt: this.now().toISOString() };
+    this.collectionCases.set(collectionCase.id, collectionCase); this.audit(actor.companyId, actor.id, 'collection.case.opened', 'collection_case', collectionCase.id); return this.collectionCaseView(collectionCase);
+  }
+  collectionCaseView(collectionCase) { return { ...collectionCase, invoice: this.invoiceView(this.invoices.get(collectionCase.invoiceId)), promises: [...this.promises.values()].filter((promise) => promise.collectionCaseId === collectionCase.id) }; }
+  listCollectionCases(companyId) { return [...this.collectionCases.values()].filter((item) => item.companyId === companyId).map((item) => this.collectionCaseView(item)); }
+  recordPromise(actor, collectionCaseId, input) {
+    this.requireRole(actor, 'operator'); const collectionCase = this.collectionCases.get(collectionCaseId);
+    if (!collectionCase || collectionCase.companyId !== actor.companyId) throw new Error('collection case not found'); if (collectionCase.status !== 'open') throw new Error('collection case is closed');
+    const amount = money(input.amount); const invoice = this.invoiceView(this.invoices.get(collectionCase.invoiceId));
+    if (!input.dueDate || Number.isNaN(Date.parse(input.dueDate)) || new Date(input.dueDate) < this.now()) throw new Error('promise dueDate must be today or later');
+    if (amount === 0 || amount > invoice.outstanding) throw new Error('promise amount must not exceed invoice outstanding');
+    const promise = { id: randomUUID(), companyId: actor.companyId, collectionCaseId, amount, dueDate: input.dueDate, status: 'open', createdBy: actor.id, createdAt: this.now().toISOString() };
+    this.promises.set(promise.id, promise); this.audit(actor.companyId, actor.id, 'collection.promise.recorded', 'promise_to_pay', promise.id); return promise;
   }
   dashboard(companyId) { const invoices = this.listInvoices(companyId); const customers = this.listCustomers(companyId); return { customers: customers.length, invoices: invoices.length, receivable: invoices.reduce((sum, i) => sum + i.outstanding, 0), collected: invoices.reduce((sum, i) => sum + i.paid, 0), overdue: invoices.filter((i) => i.outstanding > 0 && new Date(i.dueDate) < this.now()).reduce((sum, i) => sum + i.outstanding, 0) }; }
   audit(companyId, actorId, action, entityType, entityId) { this.auditEvents.push({ id: randomUUID(), companyId, actorId, action, entityType, entityId, occurredAt: this.now().toISOString() }); }
