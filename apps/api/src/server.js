@@ -13,6 +13,7 @@ const route = async (request, response) => {
   if (request.method === 'POST' && path === '/v1/auth/login') { const input = await body(request); return json(response, 200, app.authenticate(input.email, input.password)); }
   const user = actor(request); const input = request.method === 'GET' ? {} : await body(request);
   if (request.method === 'GET' && path === '/v1/company') return json(response, 200, app.companies.get(user.companyId));
+  if (request.method === 'POST' && path === '/v1/users') return json(response, 201, app.createUser(user, input));
   if (request.method === 'POST' && path === '/v1/customers') return json(response, 201, app.createCustomer(user.companyId, input));
   if (request.method === 'GET' && path === '/v1/customers') return json(response, 200, app.listCustomers(user.companyId));
   if (request.method === 'POST' && path === '/v1/invoices') return json(response, 201, app.issueInvoice(user.companyId, input));
