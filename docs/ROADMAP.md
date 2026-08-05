@@ -17,6 +17,8 @@
 
 Promises-to-pay, assignment queues, automated reminders, collection activity timeline, and WhatsApp/email/SMS connectors.
 
+The case, assignment, and promise domain is implemented locally. Communications provider delivery, collection activity, and reminder jobs are scaffolded next.
+
 ## Sprint 3 — Intelligence
 
 Credit policy configuration, payment prediction, explainable risk scores, and a governed collections copilot.

@@ -1,6 +1,7 @@
 import http from 'node:http';
 import { pathToFileURL } from 'node:url';
 import { CredosService } from './domain.js';
+import { moduleCatalog } from './modules/catalog.js';
 
 const json = (response, status, body) => { response.writeHead(status, { 'content-type': 'application/json', 'access-control-allow-origin': '*' }); response.end(JSON.stringify(body)); };
 const body = async (request) => { let data = ''; for await (const chunk of request) data += chunk; return data ? JSON.parse(data) : {}; };
@@ -30,6 +31,7 @@ export const createServer = ({ service } = {}) => {
   const promiseRoute = path.match(/^\/v1\/collections\/([^/]+)\/promises$/);
   if (request.method === 'POST' && promiseRoute) return json(response, 201, app.recordPromise(user, promiseRoute[1], input));
   if (request.method === 'GET' && path === '/v1/dashboard') return json(response, 200, app.dashboard(user.companyId));
+  if (request.method === 'GET' && path === '/v1/platform/modules') return json(response, 200, moduleCatalog);
   return json(response, 404, { error: 'route not found' });
   };
   return http.createServer((request, response) => route(request, response).catch((error) => json(response, error.message.includes('token') ? 401 : error.message.includes('permission') ? 403 : 400, { error: error.message })));

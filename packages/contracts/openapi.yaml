@@ -1,0 +1,27 @@
+openapi: 3.1.0
+info:
+  title: CredOS API
+  version: 0.1.0
+  description: Tenant-scoped credit operations API. All money values are integer minor units.
+servers:
+  - url: /v1
+paths:
+  /auth/login:
+    post: { summary: Create access session, responses: { '200': { description: Authenticated } } }
+  /company:
+    get: { summary: Get company profile, responses: { '200': { description: Company } } }
+    patch: { summary: Update company profile, responses: { '200': { description: Company } } }
+  /customers:
+    get: { summary: List customers, responses: { '200': { description: Customer list } } }
+    post: { summary: Create customer, responses: { '201': { description: Customer } } }
+  /invoices:
+    get: { summary: List invoices, responses: { '200': { description: Invoice list } } }
+    post: { summary: Issue invoice, responses: { '201': { description: Invoice } } }
+  /payments:
+    get: { summary: List payments, responses: { '200': { description: Payment list } } }
+    post: { summary: Record payment, responses: { '201': { description: Payment } } }
+  /collections:
+    get: { summary: List collection cases, responses: { '200': { description: Collection case list } } }
+    post: { summary: Open collection case, responses: { '201': { description: Collection case } } }
+  /platform/modules:
+    get: { summary: List enabled platform modules, responses: { '200': { description: Module catalog } } }
