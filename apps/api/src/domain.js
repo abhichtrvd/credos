@@ -22,6 +22,12 @@ export class CredosService {
     const company = { id: randomUUID(), name: name.trim(), currency, createdAt: this.now().toISOString() };
     this.companies.set(company.id, company); this.audit(company.id, null, 'company.created', 'company', company.id); return company;
   }
+  updateCompany(actor, input) {
+    this.requireRole(actor, 'owner'); const company = this.companies.get(actor.companyId);
+    if (input.name !== undefined) { if (!String(input.name).trim()) throw new Error('company name is required'); company.name = String(input.name).trim(); }
+    if (input.currency !== undefined) { if (!/^[A-Z]{3}$/.test(input.currency)) throw new Error('currency must be an ISO 4217 code'); company.currency = input.currency; }
+    this.audit(company.id, actor.id, 'company.updated', 'company', company.id); return company;
+  }
   authenticate(email, password) {
     const user = [...this.users.values()].find((item) => item.email === String(email).toLowerCase());
     if (!user || !verifyPassword(password, user.passwordHash)) throw new Error('invalid email or password');
@@ -54,14 +60,23 @@ export class CredosService {
     const invoice = { id: randomUUID(), companyId, customerId: customer.id, number, total, dueDate: input.dueDate, issuedAt: this.now().toISOString(), status: 'open' };
     this.invoices.set(invoice.id, invoice); this.audit(companyId, null, 'invoice.issued', 'invoice', invoice.id); return this.invoiceView(invoice);
   }
-  invoiceView(invoice) { const paid = [...this.allocations.values()].filter((a) => a.invoiceId === invoice.id).reduce((sum, a) => sum + a.amount, 0); return { ...invoice, paid, outstanding: invoice.total - paid, status: paid === invoice.total ? 'paid' : invoice.status }; }
+  invoiceView(invoice) { const paid = [...this.allocations.values()].filter((a) => a.invoiceId === invoice.id).reduce((sum, a) => sum + a.amount, 0); const cancelled = invoice.status === 'cancelled'; return { ...invoice, paid, outstanding: cancelled ? 0 : invoice.total - paid, status: cancelled ? 'cancelled' : paid === invoice.total ? 'paid' : invoice.status }; }
   listInvoices(companyId) { return [...this.invoices.values()].filter((item) => item.companyId === companyId).map((item) => this.invoiceView(item)); }
   recordPayment(companyId, input) {
     const invoice = this.invoices.get(input.invoiceId); if (!invoice || invoice.companyId !== companyId) throw new Error('invoice not found');
+    if (invoice.status === 'cancelled') throw new Error('cannot record payment for a cancelled invoice');
     const amount = money(input.amount); const view = this.invoiceView(invoice);
     if (amount === 0 || amount > view.outstanding) throw new Error('payment must be greater than zero and no more than outstanding');
     const payment = { id: randomUUID(), companyId, customerId: invoice.customerId, amount, method: input.method || 'bank_transfer', receivedAt: input.receivedAt || this.now().toISOString() };
     this.payments.set(payment.id, payment); this.allocations.set(randomUUID(), { id: randomUUID(), paymentId: payment.id, invoiceId: invoice.id, amount }); this.audit(companyId, null, 'payment.recorded', 'payment', payment.id); return { payment, invoice: this.invoiceView(invoice) };
+  }
+  listPayments(companyId) { return [...this.payments.values()].filter((payment) => payment.companyId === companyId).sort((a, b) => b.receivedAt.localeCompare(a.receivedAt)); }
+  cancelInvoice(actor, invoiceId) {
+    this.requireRole(actor, 'manager'); const invoice = this.invoices.get(invoiceId);
+    if (!invoice || invoice.companyId !== actor.companyId) throw new Error('invoice not found');
+    if (this.invoiceView(invoice).paid > 0) throw new Error('cannot cancel a partially paid invoice');
+    if (invoice.status === 'cancelled') throw new Error('invoice is already cancelled');
+    invoice.status = 'cancelled'; this.audit(actor.companyId, actor.id, 'invoice.cancelled', 'invoice', invoice.id); return this.invoiceView(invoice);
   }
   dashboard(companyId) { const invoices = this.listInvoices(companyId); const customers = this.listCustomers(companyId); return { customers: customers.length, invoices: invoices.length, receivable: invoices.reduce((sum, i) => sum + i.outstanding, 0), collected: invoices.reduce((sum, i) => sum + i.paid, 0), overdue: invoices.filter((i) => i.outstanding > 0 && new Date(i.dueDate) < this.now()).reduce((sum, i) => sum + i.outstanding, 0) }; }
   audit(companyId, actorId, action, entityType, entityId) { this.auditEvents.push({ id: randomUUID(), companyId, actorId, action, entityType, entityId, occurredAt: this.now().toISOString() }); }
