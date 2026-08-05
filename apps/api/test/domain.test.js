@@ -1,0 +1,8 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { CredosService } from '../src/domain.js';
+
+const service = () => { const app = new CredosService({ now: () => new Date('2026-08-05T00:00:00Z') }); const { company } = app.seedAdmin(); return { app, company }; };
+test('a payment cannot exceed its invoice outstanding balance', () => { const { app, company } = service(); const customer = app.createCustomer(company.id, { name: 'Aster' }); const invoice = app.issueInvoice(company.id, { customerId: customer.id, total: 10000, dueDate: '2026-08-10' }); assert.throws(() => app.recordPayment(company.id, { invoiceId: invoice.id, amount: 10001 }), /outstanding/); });
+test('payment allocation updates invoice and dashboard totals', () => { const { app, company } = service(); const customer = app.createCustomer(company.id, { name: 'Aster' }); const invoice = app.issueInvoice(company.id, { customerId: customer.id, total: 10000, dueDate: '2026-08-10' }); const result = app.recordPayment(company.id, { invoiceId: invoice.id, amount: 4000 }); assert.equal(result.invoice.outstanding, 6000); assert.deepEqual(app.dashboard(company.id), { customers: 1, invoices: 1, receivable: 6000, collected: 4000, overdue: 0 }); });
+test('a company cannot invoice another company customer', () => { const { app, company } = service(); const other = app.createCompany({ name: 'Other' }); const customer = app.createCustomer(company.id, { name: 'Private customer' }); assert.throws(() => app.issueInvoice(other.id, { customerId: customer.id, total: 1, dueDate: '2026-08-10' }), /customer not found/); });
