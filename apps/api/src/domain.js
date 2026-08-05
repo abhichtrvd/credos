@@ -47,7 +47,11 @@ export class CredosService {
     if (!customer || customer.companyId !== companyId) throw new Error('customer not found');
     const total = money(input.total);
     if (!input.dueDate || Number.isNaN(Date.parse(input.dueDate))) throw new Error('valid dueDate is required');
-    const invoice = { id: randomUUID(), companyId, customerId: customer.id, number: input.number?.trim() || `INV-${Date.now()}`, total, dueDate: input.dueDate, issuedAt: this.now().toISOString(), status: 'open' };
+    const number = input.number?.trim() || `INV-${Date.now()}`;
+    if ([...this.invoices.values()].some((invoice) => invoice.companyId === companyId && invoice.number === number)) throw new Error('invoice number already exists');
+    const currentOutstanding = this.listInvoices(companyId).filter((invoice) => invoice.customerId === customer.id).reduce((sum, invoice) => sum + invoice.outstanding, 0);
+    if (customer.creditLimit > 0 && currentOutstanding + total > customer.creditLimit) throw new Error('invoice exceeds customer credit limit');
+    const invoice = { id: randomUUID(), companyId, customerId: customer.id, number, total, dueDate: input.dueDate, issuedAt: this.now().toISOString(), status: 'open' };
     this.invoices.set(invoice.id, invoice); this.audit(companyId, null, 'invoice.issued', 'invoice', invoice.id); return this.invoiceView(invoice);
   }
   invoiceView(invoice) { const paid = [...this.allocations.values()].filter((a) => a.invoiceId === invoice.id).reduce((sum, a) => sum + a.amount, 0); return { ...invoice, paid, outstanding: invoice.total - paid, status: paid === invoice.total ? 'paid' : invoice.status }; }
