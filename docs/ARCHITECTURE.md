@@ -33,3 +33,5 @@ The database skeleton includes the outbox and the core storage boundaries for co
 ## Persistence floor
 
 `PostgresRepository` creates a database transaction for each tenant command and sets `credos.company_id` using PostgreSQL's transaction-local configuration. Migration `0004_tenant_rls.sql` makes row-level security enforce that boundary for every tenant-owned table. Production must connect using a non-owner database role, because PostgreSQL table owners bypass RLS by default.
+
+`ReceivablesRepositories` is the first database-backed business layer. It locks customer/invoice records during issue and payment commands, retains integer money values, relies on the invoice uniqueness constraint, and inserts payment plus allocation atomically.

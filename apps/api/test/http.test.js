@@ -1,9 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from '../src/server.js';
+import { CredosService } from '../src/domain.js';
 
 const start = async () => {
-  const server = createServer(); await new Promise((resolve) => server.listen(0, resolve));
+  const service = new CredosService({ now: () => new Date('2026-08-05T00:00:00Z') });
+  const server = createServer({ service }); await new Promise((resolve) => server.listen(0, resolve));
   return { server, url: `http://127.0.0.1:${server.address().port}` };
 };
 const request = (url, path, options = {}) => fetch(`${url}${path}`, { ...options, headers: { 'content-type': 'application/json', ...options.headers } });
